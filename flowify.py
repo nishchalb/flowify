@@ -1,4 +1,25 @@
 import spotipy
+import peewee
+
+db = peewee.SqliteDatabase('audio_features.db')
+
+class Track(peewee.Model):
+    track_id = peewee.CharField(primary_key=True)
+    acousticness = peewee.FloatField()
+    danceability = peewee.FloatField()
+    energy = peewee.FloatField()
+    instrumentalness = peewee.FloatField()
+    key = peewee.IntegerField()
+    liveness = peewee.FloatField()
+    loudness = peewee.FloatField()
+    mode = peewee.IntegerField()
+    speechiness = peewee.FloatField()
+    tempo = peewee.FloatField()
+    time_signature = peewee.IntegerField()
+    valence = peewee.FloatField()
+
+    class Meta:
+        database = db
 
 def get_playlists(sp):
     """ Get the current user's playlists
@@ -46,5 +67,50 @@ def get_tracks_from_playlist(sp, playlist):
     return tracks
 
 def feature_vector_from_track(sp, track):
-    audio_features = sp.audio_features([track['id']])
+    """ Construct a feature vector from a given track
+
+    Args:
+        sp (spotipy.client.Spotify): A spotipy client with an auth token
+        track (dict): A dictionary representing a spotify track object
+
+    Returns:
+        list: A list representing a feature vector for the given track
+    """
+    # First check if the features for this track are already stored
+    if Track.select().where(Track.track_id == track['id']).count() > 0:
+        track_features = Track.get(Track.track_id == track['id'])
+    else:
+        # Get result and add to database
+        audio_features = sp.audio_features([track['id']])[0]
+        track_features = Track.create(
+                track_id = audio_features['id'],
+                acousticness = audio_features['acousticness'],
+                danceability = audio_features['danceability'],
+                energy = audio_features['energy'],
+                instrumentalness = audio_features['instrumentalness'],
+                key = audio_features['key'],
+                liveness = audio_features['liveness'],
+                loudness = audio_features['loudness'],
+                mode = audio_features['mode'],
+                speechiness = audio_features['speechiness'],
+                tempo = audio_features['tempo'],
+                time_signature = audio_features['time_signature'],
+                valence = audio_features['valence'])
+    # Now construct vector
+    vector = []
+    vector.append(track['artists'][0]['id'])
+    vector.append(track_features.acousticness)
+    vector.append(track_features.danceability)
+    vector.append(track_features.energy)
+    vector.append(track_features.instrumentalness)
+    vector.append(track_features.key)
+    vector.append(track_features.liveness)
+    vector.append(track_features.loudness)
+    vector.append(track_features.mode)
+    vector.append(track_features.speechiness)
+    vector.append(track_features.tempo)
+    vector.append(track_features.time_signature)
+    vector.append(track_features.valence)
+
+    return vector
 
